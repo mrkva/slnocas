@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Slnočas (suntime): a timekeeping scale from −1 to +1 that follows the daylight. Sunrise 0, solar noon 1, solar midnight −1.">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Slnočas">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 fill=%22white%22 stroke=%22black%22/%3E%3Cpath d=%22M0 8h16%22 stroke=%22black%22/%3E%3Cpath d=%22M3 8a5 5 0 0 1 10 0z%22/%3E%3C/svg%3E">
+<style>html,body{margin:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<title>Slnočas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Datatype:wght@100..900&display=swap">
+<style>
+/* Layout: borderless sheet of ruled rows; reading first, controls after. Ink follows the sun: slnočas >= 0 white, < 0 black */
+:root{
+  --bg:#ffffff; --fg:#000000;
+  --font:"Datatype",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+:root[data-sun="night"]{--bg:#000000;--fg:#ffffff;color-scheme:dark}
+[hidden]{display:none!important}
+*{border-radius:0!important;box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px;line-height:1.45;
+  font-variant-numeric:tabular-nums;-webkit-text-size-adjust:100%;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
+.sheet{max-width:860px;margin:0 auto}
+.cell{border-bottom:1px solid var(--fg);padding:14px 0;min-width:0}
+.cell:last-child{border-bottom:0}
+header.cell{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-top:4px}
+h1{margin:0;font-size:16px;font-weight:700;letter-spacing:.02em}
+.k{text-transform:uppercase;letter-spacing:.1em;font-size:11px}
+.value{font-weight:700;font-size:clamp(56px,16vw,112px);line-height:1;letter-spacing:-.04em;margin:8px 0 6px;white-space:nowrap}
+.arrow{font-size:.5em;vertical-align:.25em;margin-right:.08em}
+#state{font-size:15px}
+#next{font-size:13px;margin-top:2px}
+canvas{display:block;width:100%;max-width:100%}
+#wave{height:240px} #year{height:120px;cursor:pointer;touch-action:pan-y}
+@media (max-width:560px){#wave{height:190px}}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border:1px solid var(--fg);padding:7px 8px;text-align:left;font-weight:400;vertical-align:middle}
+th{text-transform:uppercase;letter-spacing:.08em;font-size:10.5px}
+.flush{padding:0}
+.flush table{border-style:hidden}
+.flush tr>*:first-child{padding-left:0}
+.flush tr>*:last-child{padding-right:0}
+th.num,td.num{text-align:right;white-space:nowrap}
+.kv th{width:1%;white-space:nowrap}
+.now td{background:var(--fg);color:var(--bg)}
+.now td:first-child{padding-left:6px}
+.now .bar i{background:var(--bg)}
+.now .bar i.neg{background:transparent}
+.bar{position:relative;height:9px;width:100%;min-width:80px}
+.bar::before{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;border-left:1px solid currentColor}
+.bar i{position:absolute;top:0;bottom:0;background:var(--fg)}
+.bar i.neg{background:transparent;border:1px solid currentColor}
+/* controls */
+.tabs{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--fg)}
+.tabs button{border:0;min-height:44px}
+.tabs button+button{border-left:1px solid var(--fg)}
+.tabs button[aria-selected="true"]{background:var(--fg);color:var(--bg)}
+.controls{display:grid;gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.field{display:grid;gap:4px;flex:1 1 150px;min-width:0}
+.field input{width:100%}
+input{font:inherit;font-size:16px;height:44px;padding:0 10px;border:1px solid var(--fg);background:var(--bg);color:var(--fg);min-width:0}
+button{font:inherit;text-transform:uppercase;letter-spacing:.08em;font-size:12px;min-height:44px;min-width:44px;padding:0 14px;border:1px solid var(--fg);background:var(--bg);color:var(--fg);cursor:pointer;touch-action:manipulation}
+@media (hover:hover){button:hover{background:var(--fg);color:var(--bg)}}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.steps{display:flex;gap:8px;align-self:end}
+details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;list-style:none}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:"+";margin-left:auto;font-size:16px}
+details[open] summary::after{content:"−"}
+details .row{padding-top:4px}
+#locMsg{font-size:12px}
+p{margin:0;max-width:65ch}
+.about{display:grid;gap:12px;padding-top:28px}
+.about h2{margin:0 0 4px;font-weight:400}
+.about p{font-size:15px;line-height:1.6;text-wrap:pretty}
+.small{font-size:12px}
+a{color:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+@media (hover:hover){a:hover{background:var(--fg);color:var(--bg);text-decoration:none}}
+a:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <header class="cell">
+    <h1>Slnočas</h1>
+    <span class="k" id="place">48.149° N 17.108° E</span>
+  </header>
+
+  <section class="cell">
+    <div class="k" id="clock">—</div>
+    <div class="value" id="value">—</div>
+    <div id="state">—</div>
+    <div id="next">—</div>
+  </section>
+
+  <section class="cell">
+    <div class="k" id="waveLabel">Today</div>
+    <canvas id="wave" aria-label="Slnočas curve for the selected day"></canvas>
+  </section>
+
+  <section class="cell controls">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tabNow" aria-selected="true">Now</button>
+      <button type="button" role="tab" id="tabConv" aria-selected="false">Convert</button>
+    </div>
+    <div class="row">
+      <label class="field"><span class="k">Date</span><input type="date" id="date"></label>
+      <label class="field" id="timeField" hidden><span class="k">Time</span><input type="time" id="time" step="60" value="12:00"></label>
+    </div>
+    <div class="row">
+      <button type="button" id="prev" aria-label="Previous day">‹ Day</button>
+      <button type="button" id="next1" aria-label="Next day">Day ›</button>
+      <button type="button" id="today" style="margin-left:auto">Today</button>
+    </div>
+    <details id="loc">
+      <summary class="k">Location</summary>
+      <div class="row">
+        <label class="field"><span class="k">Latitude</span><input type="number" inputmode="decimal" id="lat" step="0.0001" min="-65" max="65" value="48.1486"></label>
+        <label class="field"><span class="k">Longitude</span><input type="number" inputmode="decimal" id="lon" step="0.0001" min="-180" max="180" value="17.1077"></label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button type="button" id="geo">Use my location</button>
+        <button type="button" id="bts">Bratislava</button>
+        <span id="locMsg"></span>
+      </div>
+    </details>
+  </section>
+
+  <section class="cell flush" id="convBox" hidden>
+    <table class="kv" id="conv"></table>
+  </section>
+
+  <section class="cell flush">
+    <table class="kv" id="stats"></table>
+  </section>
+
+  <section class="cell">
+    <div class="k">Length of a daylight hour (solid) and night hour (dashed) in minutes · tap or drag to pick a day</div>
+    <canvas id="year" aria-label="Daylight and night hour length across the year"></canvas>
+  </section>
+
+  <section class="cell flush">
+    <table id="hours"></table>
+  </section>
+
+  <section class="cell about">
+    <h2 class="k">About slnočas</h2>
+    <p>Inspired by <a href="https://en.wikipedia.org/wiki/Sundial" target="_blank" rel="noopener">sundials</a> and Japanese timekeeping, I started to wonder whether I could create a timekeeping method of my own. I started from two premises. First, I believe there is something inherently crucial about the Sun, sunrise and sunset. Second, I perceive the time of day as a wave that follows the sunlight—noon is the “peak” of the day, not its half. So I devised a simple scale called slnočas (“suntime” in Slovak).</p>
+    <p>Slnočas starts at sunrise, where it reads 0. Over the course of the day it rises smoothly towards 1, which it reaches at <a href="https://en.wikipedia.org/wiki/Noon" target="_blank" rel="noopener">solar noon</a>, the peak of the day, and then falls back to 0 at sunset. After sunset it continues to “fall”, reaching −1 at solar midnight, and then climbs back to 0 at the next sunrise. The wave is not a measurement of how high the Sun actually stands; it is stretched to fit the day. The daylight half always spans the whole time from sunrise to sunset, however long that is, and the night half fills the rest. In Bratislava in June the climb from 0 to 1 takes about eight hours and the fall from 0 to −1 about four; in December it is the other way round. Slnočas therefore runs fast in winter days and slow in summer ones. Same as <a href="https://en.wikipedia.org/wiki/Japanese_clock" target="_blank" rel="noopener">和時計 (wadokei)</a>, it reflects the sun, just in a more modern numeric format. Needless to say, slnočas doesn’t do <a href="https://en.wikipedia.org/wiki/Daylight_saving_time" target="_blank" rel="noopener">daylight saving time</a>.</p>
+    <p>This also means that slnočas is extremely local and needs to be calculated for specific coordinates. The other option is using a specifically crafted sundial, also made for specific coordinates—as all common sundials are.</p>
+  </section>
+
+  <section class="cell">
+    <p class="small">On this page: each half of the wave is divided into 12 equal parts, the “daylight hour” and “night hour” in the tables, like the historical <a href="https://en.wikipedia.org/wiki/Unequal_hours" target="_blank" rel="noopener">unequal hours</a>. Solar noon and midnight follow <a href="https://en.wikipedia.org/wiki/Solar_time" target="_blank" rel="noopener">apparent solar time</a>, not the clock. Clock times are shown in this device’s time zone. The page is white while slnočas is positive and black while it is negative.</p>
+  </section>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const rad=Math.PI/180;
+const HOME={lat:48.1486,lon:17.1077};
+let LAT=HOME.lat, LON=HOME.lon;
+let mode='now', follow=true;
+
+function sunAt(ms){
+  const n=ms/864e5+2440587.5-2451545;
+  const L=(280.460+0.9856474*n)%360;
+  const g=((357.528+0.9856003*n)%360)*rad;
+  const lam=(L+1.915*Math.sin(g)+0.020*Math.sin(2*g))*rad;
+  const eps=(23.439-4e-7*n)*rad;
+  const dec=Math.asin(Math.sin(eps)*Math.sin(lam));
+  const ra=((Math.atan2(Math.cos(eps)*Math.sin(lam),Math.cos(lam))/rad)%360+360)%360;
+  const eot=(((L-ra+180)%360+360)%360-180)*4;
+  return {dec,eot};
+}
+function dayParams(d){
+  const base=Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());
+  let noon=base+(12-LON/15)*36e5, s;
+  for(let i=0;i<2;i++){ s=sunAt(noon); noon=base+(12-LON/15-s.eot/60)*36e5; }
+  const h0=-0.833*rad, phi=LAT*rad;
+  let c=(Math.sin(h0)-Math.sin(phi)*Math.sin(s.dec))/(Math.cos(phi)*Math.cos(s.dec));
+  c=Math.max(-0.9986,Math.min(0.9986,c));
+  const H=Math.acos(c)/rad/15;
+  return {noon,H,rise:noon-H*36e5,set:noon+H*36e5,len:2*H};
+}
+function sloncas(t,p){
+  let dt=(t-p.noon)/36e5; dt=((dt+12)%24+24)%24-12;
+  const a=Math.abs(dt);
+  const v=a<=p.H?Math.cos(Math.PI*dt/(2*p.H)):-Math.sin(Math.PI*(a-p.H)/(24-2*p.H));
+  return {v,rising:dt<0,day:a<=p.H,dt};
+}
+const pad=n=>String(n).padStart(2,'0');
+const fmtT=ms=>new Date(ms).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',hour12:false});
+const fmtH=h=>{const m=Math.round(h*60);return `${Math.floor(m/60)}h ${pad(m%60)}m`};
+const fmtDur=min=>`${Math.floor(min/60)}h ${pad(min%60)}m`;
+const sgn=(v,n=3)=>{const f=10**n,m=Math.floor(Math.abs(v)*f+1e-9)/f;return (v<0?'−':'+')+m.toFixed(n)};
+const isoDate=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseDate=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||'');return m?new Date(+m[1],m[2]-1,+m[3]):null};
+const dayStart=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
+
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function cfont(px){return `${px}px ${css('--font')}`}
+function prep(cv){
+  const dpr=window.devicePixelRatio||1, r=cv.getBoundingClientRect();
+  cv.width=Math.round(r.width*dpr); cv.height=Math.round(r.height*dpr);
+  const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx,w:r.width,h:r.height};
+}
+function hatch(ctx,fg){
+  const c=document.createElement('canvas');c.width=c.height=6;const x=c.getContext('2d');
+  x.strokeStyle=fg;x.lineWidth=1;x.beginPath();x.moveTo(0,6);x.lineTo(6,0);x.stroke();
+  return ctx.createPattern(c,'repeat');
+}
+
+function drawWave(d,p,t){
+  const {ctx,w,h}=prep($('wave'));
+  const fg=css('--fg'),bg=css('--bg');
+  const L=26,R=2,T=22,B=22,W=w-L-R,Hh=h-T-B,y0=dayStart(d);
+  const X=ms=>L+(ms-y0)/864e5*W, Y=v=>T+(1-v)/2*Hh;
+  ctx.font=cfont(11);ctx.fillStyle=fg;ctx.strokeStyle=fg;ctx.lineWidth=1;
+  ctx.strokeRect(L+.5,T+.5,W-1,Hh-1);
+  [-1,0,1].forEach(v=>{
+    ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(v===0?'0':(v>0?'+1':'−1'),L-5,Y(v));
+    if(v===0){ctx.beginPath();ctx.moveTo(L,Y(0)+.5);ctx.lineTo(L+W,Y(0)+.5);ctx.stroke()}
+  });
+  ctx.textAlign='center';ctx.textBaseline='top';
+  const step=w<480?6:3;
+  for(let hr=0;hr<=24;hr+=step){const x=L+hr/24*W;ctx.textAlign=hr===0?'left':hr===24?'right':'center';ctx.fillText(pad(hr),x,T+Hh+6);
+    ctx.beginPath();ctx.moveTo(x+.5,T+Hh);ctx.lineTo(x+.5,T+Hh+4);ctx.stroke()}
+  const N=360,pts=[];
+  for(let i=0;i<=N;i++){const ms=y0+i/N*864e5;pts.push([X(ms),sloncas(ms,p).v])}
+  [[1,fg],[-1,hatch(ctx,fg)]].forEach(([k,fill])=>{
+    ctx.beginPath();ctx.moveTo(pts[0][0],Y(0));
+    pts.forEach(([x,v])=>ctx.lineTo(x,Y(k>0?Math.max(v,0):Math.min(v,0))));
+    ctx.lineTo(pts[N][0],Y(0));ctx.closePath();ctx.fillStyle=fill;ctx.fill();
+  });
+  ctx.beginPath();pts.forEach(([x,v],i)=>i?ctx.lineTo(x,Y(v)):ctx.moveTo(x,Y(v)));ctx.lineWidth=1.5;ctx.strokeStyle=fg;ctx.stroke();
+  const ref=()=>{ctx.beginPath();for(let i=0;i<=N;i++){const ms=y0+i/N*864e5,v=Math.cos(Math.PI*((ms-p.noon)/36e5)/12);i?ctx.lineTo(X(ms),Y(v)):ctx.moveTo(X(ms),Y(v))}};
+  ctx.setLineDash([3,3]);ctx.lineWidth=1;
+  ctx.strokeStyle=bg;ref();ctx.lineDashOffset=0;ctx.stroke();
+  ctx.strokeStyle=fg;ref();ctx.lineDashOffset=3;ctx.stroke();
+  ctx.setLineDash([]);ctx.lineDashOffset=0;
+  ctx.fillStyle=fg;ctx.textBaseline='bottom';
+  [[p.rise,'↑'+fmtT(p.rise),'right',-4,Y(0)-4],[p.noon,fmtT(p.noon),'center',0,T-5],[p.set,fmtT(p.set)+'↓','left',4,Y(0)-4]].forEach(([ms,l,al,dx,yy])=>{
+    ctx.textAlign=al;ctx.fillText(l,X(ms)+dx,yy)});
+  const s=sloncas(t,p),x=X(t);
+  ctx.fillStyle=bg;ctx.fillRect(x-1,T,3,Hh);ctx.fillStyle=fg;ctx.fillRect(x,T,1,Hh);
+  ctx.fillStyle=bg;ctx.fillRect(x-5,Y(s.v)-5,10,10);ctx.strokeStyle=fg;ctx.lineWidth=1.5;ctx.strokeRect(x-4.5,Y(s.v)-4.5,9,9);
+}
+
+let yearCache=null;
+const YL=26,YR=2;
+function drawYear(d){
+  const {ctx,w,h}=prep($('year'));
+  const fg=css('--fg');
+  const T=6,B=22,W=w-YL-YR,Hh=h-T-B,y=d.getFullYear(),key=y+'|'+LAT+'|'+LON;
+  if(!yearCache||yearCache.key!==key){
+    const arr=[];for(let i=0;i<366;i++){const dd=new Date(y,0,1+i);if(dd.getFullYear()!==y)break;arr.push(dayParams(dd).len*5)}
+    yearCache={key,arr};
+  }
+  const a=yearCache.arr,lo=20,hi=100,Y=v=>T+(1-(Math.max(lo,Math.min(hi,v))-lo)/(hi-lo))*Hh,X=i=>YL+i/(a.length-1)*W;
+  ctx.font=cfont(11);ctx.fillStyle=fg;ctx.strokeStyle=fg;ctx.lineWidth=1;
+  ctx.strokeRect(YL+.5,T+.5,W-1,Hh-1);
+  [60].forEach(v=>{ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(v,YL-5,Y(v))});
+  ctx.setLineDash([1,3]);ctx.beginPath();ctx.moveTo(YL,Y(60)+.5);ctx.lineTo(YL+W,Y(60)+.5);ctx.stroke();ctx.setLineDash([]);
+  ctx.textAlign='center';ctx.textBaseline='top';
+  'JFMAMJJASOND'.split('').forEach((c,m)=>{const i=Math.round((new Date(y,m,15)-new Date(y,0,1))/864e5);ctx.fillText(c,X(i),T+Hh+6)});
+  ctx.lineWidth=1.5;ctx.beginPath();a.forEach((v,i)=>i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v)));ctx.stroke();
+  ctx.setLineDash([4,3]);ctx.beginPath();a.forEach((v,i)=>i?ctx.lineTo(X(i),Y(120-v)):ctx.moveTo(X(i),Y(120-v)));ctx.stroke();ctx.setLineDash([]);
+  const doy=Math.min(a.length-1,Math.round((dayStart(d)-new Date(y,0,1))/864e5));
+  ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(X(doy)+.5,T);ctx.lineTo(X(doy)+.5,T+Hh);ctx.stroke();
+  [a[doy],120-a[doy]].forEach(v=>ctx.fillRect(X(doy)-3,Y(v)-3,7,7));
+}
+
+function selected(){
+  const now=new Date();
+  if(mode==='now'&&follow){$('date').value=isoDate(now);return {d:now,t:now.getTime()}}
+  const d=parseDate($('date').value)||now;
+  if(mode==='now') return {d,t:new Date(d.getFullYear(),d.getMonth(),d.getDate(),now.getHours(),now.getMinutes(),now.getSeconds()).getTime()};
+  const m=/^(\d{1,2}):(\d{2})/.exec($('time').value)||[0,12,0];
+  return {d,t:new Date(d.getFullYear(),d.getMonth(),d.getDate(),+m[1],+m[2]).getTime()};
+}
+function nextEvent(t,s,p){
+  const mids=[p.noon-12*36e5,p.noon+12*36e5,p.noon+36*36e5];
+  const cands=s.day?(s.rising?[['+1 at solar noon',p.noon]]:[['0 at sunset',p.set]])
+    :(s.rising?[['0 at sunrise',p.rise],['0 at sunrise',p.rise+864e5]]:mids.map(m=>['−1 at solar midnight',m]));
+  return cands.find(c=>c[1]>t)||cands[cands.length-1];
+}
+
+// light update: text that changes every second
+function renderReading(){
+  const {d,t}=selected(),p=dayParams(d),s=sloncas(t,p);
+  const sun=s.v>=0?'day':'night';
+  const changed=document.documentElement.dataset.sun!==sun;
+  if(changed){document.documentElement.dataset.sun=sun;
+    const tc=document.querySelector('meta[name="theme-color"]');if(tc)tc.content=sun==='day'?'#ffffff':'#000000'}
+  $('value').innerHTML=`<span class="arrow">${s.rising?'↑':'↓'}</span>${sgn(s.v)}`;
+  $('state').textContent=s.day?(s.rising?'Day, rising toward noon':'Day, falling toward sunset'):(s.rising?'Night, rising toward sunrise':'Night, falling toward midnight');
+  const ne=nextEvent(t,s,p),mins=Math.max(0,Math.round((ne[1]-t)/6e4));
+  $('next').textContent=`${ne[0]} ${fmtT(ne[1])}, in ${fmtDur(mins)}`;
+  const dateStr=d.toLocaleDateString([], {weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  $('clock').textContent=dateStr+' · '+new Date(t).toLocaleTimeString([], mode==='now'?{hour12:false}:{hour:'2-digit',minute:'2-digit',hour12:false});
+  return changed;
+}
+
+function render(){
+  const {d,t}=selected(),y0=dayStart(d);
+  const p=dayParams(d),s=sloncas(t,p);
+  renderReading();
+  const isToday=y0===dayStart(new Date());
+  $('waveLabel').textContent=(isToday?'Today':d.toLocaleDateString([], {day:'numeric',month:'long',year:'numeric'}))+' · dashed: equal 12-hour day';
+  const mid=p.noon+12*36e5, midTxt=fmtT(mid)+(dayStart(new Date(mid))!==y0?' (next day)':'');
+  const rows=[['Sunrise · 0',fmtT(p.rise)],['Solar noon · +1',fmtT(p.noon)],['Sunset · 0',fmtT(p.set)],['Solar midnight · −1',midTxt],
+    ['Daylight',fmtH(p.len)],['Night',fmtH(24-p.len)],['Daylight hour',(p.len*5).toFixed(1)+' min'],['Night hour',((24-p.len)*5).toFixed(1)+' min']];
+  const wide=window.innerWidth>=640;
+  let html='';
+  if(wide){for(let i=0;i<rows.length;i+=2)html+=`<tr><th>${rows[i][0]}</th><td>${rows[i][1]}</td><th>${rows[i+1][0]}</th><td>${rows[i+1][1]}</td></tr>`}
+  else rows.forEach(r=>html+=`<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`);
+  $('stats').innerHTML=html;
+  if(mode==='convert'){
+    let part;
+    if(s.day){part=(s.dt+p.H)/(2*p.H)*12}else{const el=(((t-p.set)/36e5)%24+24)%24;part=el/(24-2*p.H)*12}
+    $('conv').innerHTML=`<tr><th>Slnočas</th><td>${s.rising?'↑':'↓'} ${sgn(s.v,4)}</td></tr>
+      <tr><th>Half</th><td>${s.day?'Day, positive':'Night, negative'}</td></tr>
+      <tr><th>${s.day?'Day':'Night'} hour</th><td>${Math.min(12,Math.floor(part)+1)} of 12, ${(part%1*100).toFixed(0)}% through</td></tr>`;
+  }
+  const curH=(isToday||mode==='convert')?new Date(t).getHours():-1;
+  let hr_='<tr><th>Hour</th><th class="num">Slnočas</th><th></th><th style="width:45%">−1 · 0 · +1</th></tr>';
+  for(let hr=0;hr<24;hr++){
+    const ms=y0+hr*36e5,q=sloncas(ms,p),v=q.v,wd=Math.abs(v)*50;
+    const bar=v>=0?`<i style="left:50%;width:${wd}%"></i>`:`<i class="neg" style="left:${50-wd}%;width:${wd}%"></i>`;
+    hr_+=`<tr${hr===curH?' class="now"':''}><td>${pad(hr)}:00</td><td class="num">${sgn(v)}</td><td>${q.rising?'↑':'↓'}</td><td><div class="bar">${bar}</div></td></tr>`;
+  }
+  $('hours').innerHTML=hr_;
+  drawWave(d,p,t);drawYear(d);
+}
+
+function setMode(m){
+  mode=m;
+  $('tabNow').setAttribute('aria-selected',m==='now');
+  $('tabConv').setAttribute('aria-selected',m==='convert');
+  $('timeField').hidden=m!=='convert';
+  $('convBox').hidden=m!=='convert';
+  $('today').textContent=m==='now'?'Today':'Now';
+  if(m==='convert'&&follow){const n=new Date();$('time').value=`${pad(n.getHours())}:${pad(n.getMinutes())}`}
+  render();
+}
+function shiftDay(k){
+  const d=parseDate($('date').value)||new Date();d.setDate(d.getDate()+k);
+  $('date').value=isoDate(d);follow=false;render();
+}
+function setPlace(lat,lon){
+  LAT=Math.max(-65,Math.min(65,lat));LON=((lon+540)%360)-180;
+  $('lat').value=LAT.toFixed(4);$('lon').value=LON.toFixed(4);
+  $('place').textContent=`${Math.abs(LAT).toFixed(3)}° ${LAT>=0?'N':'S'} ${Math.abs(LON).toFixed(3)}° ${LON>=0?'E':'W'}`;
+  render();
+}
+$('tabNow').addEventListener('click',()=>setMode('now'));
+$('tabConv').addEventListener('click',()=>setMode('convert'));
+$('date').addEventListener('change',()=>{follow=mode==='now'&&$('date').value===isoDate(new Date());render()});
+$('time').addEventListener('input',()=>{follow=false;render()});
+$('prev').addEventListener('click',()=>shiftDay(-1));
+$('next1').addEventListener('click',()=>shiftDay(1));
+$('today').addEventListener('click',()=>{
+  const n=new Date();follow=true;$('date').value=isoDate(n);
+  $('time').value=`${pad(n.getHours())}:${pad(n.getMinutes())}`;render();
+});
+['lat','lon'].forEach(id=>$(id).addEventListener('change',()=>{
+  const la=parseFloat($('lat').value),lo=parseFloat($('lon').value);
+  if(isFinite(la)&&isFinite(lo))setPlace(la,lo)}));
+$('bts').addEventListener('click',()=>{$('locMsg').textContent='';setPlace(HOME.lat,HOME.lon)});
+$('geo').addEventListener('click',()=>{
+  const msg=$('locMsg');
+  if(!navigator.geolocation){msg.textContent='Location is not available here. Type the coordinates instead.';return}
+  msg.textContent='Finding you…';
+  try{navigator.geolocation.getCurrentPosition(
+    pos=>{msg.textContent='';setPlace(pos.coords.latitude,pos.coords.longitude)},
+    ()=>{msg.textContent='Location was not shared. Type the coordinates instead.'},
+    {enableHighAccuracy:false,timeout:10000,maximumAge:6e5});
+  }catch(e){msg.textContent='Location is not available here. Type the coordinates instead.'}
+});
+// year chart: tap or drag horizontally to pick a day
+(function(){
+  const cv=$('year');let down=false;
+  const pick=e=>{const r=cv.getBoundingClientRect(),d=parseDate($('date').value)||new Date(),y=d.getFullYear();
+    const n=(new Date(y,11,31)-new Date(y,0,1))/864e5;
+    const i=Math.round((e.clientX-r.left-YL)/(r.width-YL-YR)*n);
+    const nd=isoDate(new Date(y,0,1+Math.max(0,Math.min(n,i))));
+    if(nd!==$('date').value){$('date').value=nd;follow=false;render()}};
+  cv.addEventListener('pointerdown',e=>{down=true;pick(e)});
+  cv.addEventListener('pointermove',e=>{if(down)pick(e)});
+  ['pointerup','pointercancel','pointerleave'].forEach(t=>cv.addEventListener(t,()=>down=false));
+})();
+let rw=window.innerWidth;
+window.addEventListener('resize',()=>{if(window.innerWidth!==rw){rw=window.innerWidth;render()}});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(render);
+$('date').value=isoDate(new Date());
+render();
+let lastMin=new Date().getMinutes();
+setInterval(()=>{
+  if(mode!=='now'||document.hidden)return;
+  const m=new Date().getMinutes();
+  if(m!==lastMin){lastMin=m;render();return}
+  if(renderReading())render();
+},1000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
+</script>
+</body>
+</html>
