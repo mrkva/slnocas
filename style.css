@@ -1,0 +1,218 @@
+/* Slnočas
+   A borderless sheet of ruled rows: reading first, controls after.
+   The ink follows the sun: white page while slnočas >= 0, black page while < 0. */
+
+/* ---------- Tokens ---------- */
+
+:root {
+  --bg: #ffffff;
+  --fg: #000000;
+  --font: "Datatype", ui-monospace, Menlo, Consolas, monospace;
+  --tap: 44px;
+  color-scheme: light;
+}
+
+:root[data-sun="night"] {
+  --bg: #000000;
+  --fg: #ffffff;
+  color-scheme: dark;
+}
+
+/* ---------- Base ---------- */
+
+*, *::before, *::after { box-sizing: border-box; border-radius: 0; }
+[hidden] { display: none !important; }
+
+html, body { margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  -webkit-text-size-adjust: 100%;
+  padding-top: max(16px, env(safe-area-inset-top, 0px));
+  padding-bottom: max(40px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+h1 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: .02em; }
+h2 { margin: 0; font-weight: 400; }
+p  { margin: 0; max-width: 65ch; }
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.k { text-transform: uppercase; letter-spacing: .1em; font-size: 11px; }
+.small { font-size: 12px; }
+
+/* Before a place is known, only the prompt is shown; afterwards, only the readings. */
+body.no-place .needs-place,
+body:not(.no-place) .empty-state { display: none; }
+
+/* ---------- Sheet ---------- */
+
+.sheet { max-width: 860px; margin: 0 auto; }
+
+.cell { border-bottom: 1px solid var(--fg); padding: 14px 0; min-width: 0; }
+.cell:last-child { border-bottom: 0; }
+
+header.cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.empty-state { display: grid; gap: 12px; justify-items: start; }
+
+/* ---------- Reading ---------- */
+
+.value {
+  font-weight: 700;
+  font-size: clamp(56px, 16vw, 112px);
+  line-height: 1;
+  letter-spacing: -.04em;
+  margin: 8px 0 6px;
+  white-space: nowrap;
+}
+.arrow { font-size: .5em; vertical-align: .25em; margin-right: .08em; }
+#phase { font-size: 15px; }
+#nextEvent { font-size: 13px; margin-top: 2px; }
+
+canvas { display: block; width: 100%; max-width: 100%; }
+#wave { height: 240px; }
+#year { height: 120px; cursor: pointer; touch-action: pan-y; }
+
+/* ---------- Tables ---------- */
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td {
+  border: 1px solid var(--fg);
+  padding: 7px 8px;
+  text-align: left;
+  font-weight: 400;
+  vertical-align: middle;
+}
+th { text-transform: uppercase; letter-spacing: .08em; font-size: 10.5px; }
+.num { text-align: right; white-space: nowrap; }
+
+.flush { padding: 0; }
+.flush table, .results { border-style: hidden; }
+.flush tr > :first-child, .results td:first-child { padding-left: 0; }
+.flush tr > :last-child,  .results td:last-child  { padding-right: 0; }
+
+.kv th { width: 1%; white-space: nowrap; }
+
+.current td { background: var(--fg); color: var(--bg); }
+.current td:first-child { padding-left: 6px; }
+
+/* hour bars: filled for day, outlined for night, centred on zero */
+.bar { position: relative; height: 9px; width: 100%; min-width: 80px; }
+.bar::before { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; border-left: 1px solid currentColor; }
+.bar i { position: absolute; top: 0; bottom: 0; background: currentColor; }
+.bar i.night { background: transparent; border: 1px solid currentColor; }
+
+/* ---------- Controls ---------- */
+
+.controls, .place-panel { display: grid; gap: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.field { display: grid; gap: 4px; flex: 1 1 150px; min-width: 0; }
+.field input { width: 100%; }
+.align-end { align-self: end; }
+.push-right { margin-left: auto; }
+
+input {
+  font: inherit;
+  font-size: 16px; /* keeps iOS from zooming on focus */
+  height: var(--tap);
+  padding: 0 10px;
+  border: 1px solid var(--fg);
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 0;
+}
+
+button {
+  font: inherit;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0 14px;
+  border: 1px solid var(--fg);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.tabs { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--fg); }
+.tabs button { border: 0; }
+.tabs button + button { border-left: 1px solid var(--fg); }
+.tabs button[aria-selected="true"] { background: var(--fg); color: var(--bg); }
+
+.place-button {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  max-width: 70%;
+  padding: 4px 0 4px 12px;
+  border: 0;
+  text-align: right;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+}
+.place-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.place-name::after { content: " ▾"; }
+.place-button[aria-expanded="true"] .place-name::after { content: " ▴"; }
+
+.results td { padding-top: 4px; padding-bottom: 4px; }
+.results button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+}
+
+/* ---------- About ---------- */
+
+.about { display: grid; gap: 12px; padding-top: 28px; }
+.about h2 { margin-bottom: 4px; }
+.about p { font-size: 15px; line-height: 1.6; text-wrap: pretty; }
+
+/* ---------- States ---------- */
+
+@media (hover: hover) {
+  button:hover { background: var(--fg); color: var(--bg); }
+  .place-button:hover, .results button:hover { background: var(--bg); color: var(--fg); }
+  .place-button:hover .place-name, .results button:hover { text-decoration: underline 2px; }
+  a:hover { background: var(--fg); color: var(--bg); text-decoration: none; }
+}
+
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+
+@media (max-width: 560px) {
+  #wave { height: 190px; }
+}
