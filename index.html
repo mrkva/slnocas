@@ -70,12 +70,17 @@ button{font:inherit;text-transform:uppercase;letter-spacing:.08em;font-size:12px
 @media (hover:hover){button:hover{background:var(--fg);color:var(--bg)}}
 button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
 .steps{display:flex;gap:8px;align-self:end}
-details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;list-style:none}
-details summary::-webkit-details-marker{display:none}
-details summary::after{content:"+";margin-left:auto;font-size:16px}
-details[open] summary::after{content:"−"}
-details .row{padding-top:4px}
-#locMsg{font-size:12px}
+header.cell{align-items:center}
+.placebtn{border:0;padding:4px 0 4px 12px;min-height:44px;display:grid;justify-items:end;gap:1px;text-transform:none;letter-spacing:0;font-size:14px;text-align:right;max-width:70%}
+.placebtn #placeName{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.placebtn #placeName::after{content:" ▾"}
+.placebtn[aria-expanded="true"] #placeName::after{content:" ▴"}
+@media (hover:hover){.placebtn:hover{background:var(--bg);color:var(--fg)}.placebtn:hover #placeName{text-decoration-thickness:2px}}
+.placepanel{display:grid;gap:12px}
+.results td{padding-top:4px;padding-bottom:4px}
+.results button{width:100%;text-align:left;text-transform:none;letter-spacing:0;font-size:14px;border:0;padding:0}
+.results td:first-child{padding-left:0}.results td:last-child{padding-right:0}
+.flush .results,.results{border-style:hidden}
 p{margin:0;max-width:65ch}
 .about{display:grid;gap:12px;padding-top:28px}
 .about h2{margin:0 0 4px;font-weight:400}
@@ -87,12 +92,31 @@ a:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
 </style>
 </head>
 <body>
-
 <div class="sheet">
   <header class="cell">
     <h1>Slnočas</h1>
-    <span class="k" id="place">48.149° N 17.108° E</span>
+    <button type="button" class="placebtn" id="placeBtn" aria-expanded="false" aria-controls="placePanel">
+      <span id="placeName">Bratislava</span><span class="k" id="place">48.15° N 17.11° E</span>
+    </button>
   </header>
+
+  <section class="cell placepanel" id="placePanel" hidden>
+    <form id="searchForm" class="row" role="search">
+      <label class="field"><span class="k">Find a place</span><input type="search" id="q" placeholder="City or town" autocomplete="off" enterkeyhint="search"></label>
+      <button type="submit" style="align-self:end">Search</button>
+    </form>
+    <table class="results" id="results" hidden></table>
+    <div class="row">
+      <label class="field"><span class="k">Latitude</span><input type="number" inputmode="decimal" id="lat" step="0.0001" min="-65" max="65" value="48.1486"></label>
+      <label class="field"><span class="k">Longitude</span><input type="number" inputmode="decimal" id="lon" step="0.0001" min="-180" max="180" value="17.1077"></label>
+    </div>
+    <div class="row">
+      <button type="button" id="geo">Use my precise location</button>
+      <button type="button" id="bts">Bratislava</button>
+      <button type="button" id="closePlace" style="margin-left:auto">Done</button>
+    </div>
+    <div id="locMsg" class="small" aria-live="polite"></div>
+  </section>
 
   <section class="cell">
     <div class="k" id="clock">—</div>
@@ -120,18 +144,6 @@ a:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
       <button type="button" id="next1" aria-label="Next day">Day ›</button>
       <button type="button" id="today" style="margin-left:auto">Today</button>
     </div>
-    <details id="loc">
-      <summary class="k">Location</summary>
-      <div class="row">
-        <label class="field"><span class="k">Latitude</span><input type="number" inputmode="decimal" id="lat" step="0.0001" min="-65" max="65" value="48.1486"></label>
-        <label class="field"><span class="k">Longitude</span><input type="number" inputmode="decimal" id="lon" step="0.0001" min="-180" max="180" value="17.1077"></label>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button type="button" id="geo">Use my location</button>
-        <button type="button" id="bts">Bratislava</button>
-        <span id="locMsg"></span>
-      </div>
-    </details>
   </section>
 
   <section class="cell flush" id="convBox" hidden>
@@ -159,7 +171,7 @@ a:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
   </section>
 
   <section class="cell">
-    <p class="small">On this page: each half of the wave is divided into 12 equal parts, the “daylight hour” and “night hour” in the tables, like the historical <a href="https://en.wikipedia.org/wiki/Unequal_hours" target="_blank" rel="noopener">unequal hours</a>. Solar noon and midnight follow <a href="https://en.wikipedia.org/wiki/Solar_time" target="_blank" rel="noopener">apparent solar time</a>, not the clock. Clock times are shown in this device’s time zone. The page is white while slnočas is positive and black while it is negative.</p>
+    <p class="small">On this page: each half of the wave is divided into 12 equal parts, the “daylight hour” and “night hour” in the tables, like the historical <a href="https://en.wikipedia.org/wiki/Unequal_hours" target="_blank" rel="noopener">unequal hours</a>. Solar noon and midnight follow <a href="https://en.wikipedia.org/wiki/Solar_time" target="_blank" rel="noopener">apparent solar time</a>, not the clock. Clock times are shown in this device’s time zone. The page is white while slnočas is positive and black while it is negative. Until you pick a place, your approximate location is guessed from your IP address (via geojs.io); place search uses Open-Meteo. Your chosen place is remembered only in this browser.</p>
   </section>
 </div>
 
@@ -357,11 +369,52 @@ function shiftDay(k){
   const d=parseDate($('date').value)||new Date();d.setDate(d.getDate()+k);
   $('date').value=isoDate(d);follow=false;render();
 }
-function setPlace(lat,lon){
+const STORE='slnocas.place';
+let userChose=false;
+function setPlace(lat,lon,name,opts={}){
   LAT=Math.max(-65,Math.min(65,lat));LON=((lon+540)%360)-180;
   $('lat').value=LAT.toFixed(4);$('lon').value=LON.toFixed(4);
-  $('place').textContent=`${Math.abs(LAT).toFixed(3)}° ${LAT>=0?'N':'S'} ${Math.abs(LON).toFixed(3)}° ${LON>=0?'E':'W'}`;
+  $('place').textContent=`${Math.abs(LAT).toFixed(2)}° ${LAT>=0?'N':'S'} ${Math.abs(LON).toFixed(2)}° ${LON>=0?'E':'W'}`;
+  $('placeName').textContent=name||'Custom location';
+  if(opts.save){userChose=true;try{localStorage.setItem(STORE,JSON.stringify({lat:LAT,lon:LON,name:name||''}))}catch(e){}}
   render();
+}
+function openPanel(open){
+  $('placePanel').hidden=!open;$('placeBtn').setAttribute('aria-expanded',open);
+  if(open)$('q').focus({preventScroll:true});
+}
+async function getJSON(url,ms=5000){
+  const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),ms);
+  try{const r=await fetch(url,{signal:ac.signal});if(!r.ok)throw new Error(r.status);return await r.json()}
+  finally{clearTimeout(tm)}
+}
+// approximate location from the visitor's IP address, used only until they pick a place
+async function geoipGuess(){
+  const tries=[
+    ['https://get.geojs.io/v1/ip/geo.json',d=>({lat:+d.latitude,lon:+d.longitude,name:d.city||d.region||d.country})],
+    ['https://ipapi.co/json/',d=>({lat:+d.latitude,lon:+d.longitude,name:d.city||d.region||d.country_name})]
+  ];
+  for(const [url,map] of tries){
+    try{const g=map(await getJSON(url,4000));
+      if(isFinite(g.lat)&&isFinite(g.lon)&&!userChose){setPlace(g.lat,g.lon,(g.name||'Your area')+' (approx.)');return}
+    }catch(e){}
+  }
+}
+async function searchPlace(q){
+  const msg=$('locMsg'),tbl=$('results');
+  msg.textContent='Searching…';tbl.hidden=true;
+  try{
+    const d=await getJSON('https://geocoding-api.open-meteo.com/v1/search?count=6&language=en&format=json&name='+encodeURIComponent(q));
+    const list=d.results||[];
+    if(!list.length){msg.textContent=`No place called “${q}” found. Try another spelling, or type the coordinates.`;return}
+    msg.textContent='';
+    tbl.innerHTML=list.map((r,i)=>`<tr><td><button type="button" data-i="${i}">${[r.name,r.admin1,r.country].filter(Boolean).join(', ')}</button></td><td class="num">${r.latitude.toFixed(2)}, ${r.longitude.toFixed(2)}</td></tr>`).join('');
+    tbl.hidden=false;
+    tbl.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+      const r=list[+b.dataset.i];setPlace(r.latitude,r.longitude,r.name,{save:true});
+      tbl.hidden=true;$('q').value='';openPanel(false);
+    }));
+  }catch(e){msg.textContent='Search is not available right now. Type the coordinates instead.'}
 }
 $('tabNow').addEventListener('click',()=>setMode('now'));
 $('tabConv').addEventListener('click',()=>setMode('convert'));
@@ -375,14 +428,17 @@ $('today').addEventListener('click',()=>{
 });
 ['lat','lon'].forEach(id=>$(id).addEventListener('change',()=>{
   const la=parseFloat($('lat').value),lo=parseFloat($('lon').value);
-  if(isFinite(la)&&isFinite(lo))setPlace(la,lo)}));
-$('bts').addEventListener('click',()=>{$('locMsg').textContent='';setPlace(HOME.lat,HOME.lon)});
+  if(isFinite(la)&&isFinite(lo))setPlace(la,lo,'Custom location',{save:true})}));
+$('placeBtn').addEventListener('click',()=>openPanel($('placePanel').hidden));
+$('closePlace').addEventListener('click',()=>openPanel(false));
+$('searchForm').addEventListener('submit',e=>{e.preventDefault();const q=$('q').value.trim();if(q)searchPlace(q)});
+$('bts').addEventListener('click',()=>{$('locMsg').textContent='';setPlace(HOME.lat,HOME.lon,'Bratislava',{save:true});openPanel(false)});
 $('geo').addEventListener('click',()=>{
   const msg=$('locMsg');
   if(!navigator.geolocation){msg.textContent='Location is not available here. Type the coordinates instead.';return}
   msg.textContent='Finding you…';
   try{navigator.geolocation.getCurrentPosition(
-    pos=>{msg.textContent='';setPlace(pos.coords.latitude,pos.coords.longitude)},
+    pos=>{msg.textContent='';setPlace(pos.coords.latitude,pos.coords.longitude,'My location',{save:true});openPanel(false)},
     ()=>{msg.textContent='Location was not shared. Type the coordinates instead.'},
     {enableHighAccuracy:false,timeout:10000,maximumAge:6e5});
   }catch(e){msg.textContent='Location is not available here. Type the coordinates instead.'}
@@ -403,7 +459,11 @@ let rw=window.innerWidth;
 window.addEventListener('resize',()=>{if(window.innerWidth!==rw){rw=window.innerWidth;render()}});
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(render);
 $('date').value=isoDate(new Date());
-render();
+(function initPlace(){
+  let saved=null;try{saved=JSON.parse(localStorage.getItem(STORE)||'null')}catch(e){}
+  if(saved&&isFinite(saved.lat)&&isFinite(saved.lon)){userChose=true;setPlace(saved.lat,saved.lon,saved.name||'Custom location')}
+  else{render();geoipGuess()}
+})();
 let lastMin=new Date().getMinutes();
 setInterval(()=>{
   if(mode!=='now'||document.hidden)return;
@@ -413,5 +473,6 @@ setInterval(()=>{
 },1000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
 </script>
+
 </body>
 </html>
