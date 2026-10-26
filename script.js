@@ -93,6 +93,13 @@ const fmtValue = (v, digits = 3) => {
   const f = 10 ** digits;
   return (v < 0 ? '−' : '+') + (Math.floor(Math.abs(v) * f + 1e-9) / f).toFixed(digits);
 };
+// Accepts "48.1486", "48,1486", "−74.006" (typographic minus) and a trailing N/S/E/W.
+const parseCoordinate = text => {
+  const m = /^\s*([+\-−]?\d+(?:[.,]\d+)?)\s*°?\s*([NSEWnsew])?\s*$/.exec(text || '');
+  if (!m) return NaN;
+  const value = parseFloat(m[1].replace('−', '-').replace(',', '.'));
+  return /[SWsw]/.test(m[2] || '') ? -Math.abs(value) : value;
+};
 const fmtCoords = ({ lat, lon }) =>
   `${Math.abs(lat).toFixed(2)}° ${lat >= 0 ? 'N' : 'S'} ${Math.abs(lon).toFixed(2)}° ${lon >= 0 ? 'E' : 'W'}`;
 
@@ -153,13 +160,21 @@ function setupCanvas(canvas) {
   return { ctx, width, height };
 }
 
-function hatchPattern(ctx, color) {
+// Diagonal hatching drawn at device resolution, so it stays crisp (no moiré) on high-density screens.
+function hatchPattern(ctx, color, spacing = 6) {
+  const dpr = window.devicePixelRatio || 1;
+  const size = Math.round(spacing * dpr);
   const tile = document.createElement('canvas');
-  tile.width = tile.height = 6;
+  tile.width = tile.height = size;
   const t = tile.getContext('2d');
   t.strokeStyle = color;
-  t.beginPath(); t.moveTo(0, 6); t.lineTo(6, 0); t.stroke();
-  return ctx.createPattern(tile, 'repeat');
+  t.lineWidth = Math.max(1, Math.round(dpr * 0.75));
+  t.beginPath();
+  for (const offset of [-size, 0, size]) { t.moveTo(offset, size); t.lineTo(offset + size, 0); }
+  t.stroke();
+  const pattern = ctx.createPattern(tile, 'repeat');
+  pattern.setTransform(new DOMMatrix().scale(1 / dpr)); // undo the context's dpr scaling
+  return pattern;
 }
 
 function tracePath(ctx, points) {
@@ -216,17 +231,28 @@ function drawWave(date, day, t) {
   ctx.strokeStyle = fg; tracePath(ctx, reference); ctx.lineDashOffset = 3; ctx.stroke();
   ctx.setLineDash([]); ctx.lineDashOffset = 0;
 
-  ctx.fillStyle = fg; ctx.textBaseline = 'bottom';
-  ctx.textAlign = 'right';  ctx.fillText('↑' + fmtClock(day.rise), X(day.rise) - 4, Y(0) - 4);
-  ctx.textAlign = 'center'; ctx.fillText(fmtClock(day.noon), X(day.noon), box.top - 5);
-  ctx.textAlign = 'left';   ctx.fillText(fmtClock(day.set) + '↓', X(day.set) + 4, Y(0) - 4);
-
   // current moment
   const x = X(t), y = Y(slnocas(t, day).value);
   ctx.fillStyle = bg; ctx.fillRect(x - 1, box.top, 3, h);
   ctx.fillStyle = fg; ctx.fillRect(x, box.top, 1, h);
   ctx.fillStyle = bg; ctx.fillRect(x - 5, y - 5, 10, 10);
   ctx.lineWidth = 1.5; ctx.strokeRect(x - 4.5, y - 4.5, 9, 9);
+
+  // event labels, kept inside the canvas when an event falls near midnight
+  const canvasWidth = width;
+  const label = (text, x, y, align) => {
+    const width = ctx.measureText(text).width;
+    const left = align === 'right' ? x - width : align === 'center' ? x - width / 2 : x;
+    const at = clamp(left, 0, canvasWidth - width);
+    ctx.textAlign = 'left';
+    ctx.lineWidth = 4; ctx.strokeStyle = bg; ctx.lineJoin = 'round';
+    ctx.strokeText(text, at, y); // halo so labels stay readable over the curve
+    ctx.fillText(text, at, y);
+  };
+  ctx.fillStyle = fg; ctx.textBaseline = 'bottom';
+  label('↑' + fmtClock(day.rise), X(day.rise) - 4, Y(0) - 4, 'right');
+  label(fmtClock(day.noon), X(day.noon), box.top - 5, 'center');
+  label(fmtClock(day.set) + '↓', X(day.set) + 4, Y(0) - 4, 'left');
 }
 
 // Minutes in one daylight "hour" (1/12 of the daylight) for each day of the year.
@@ -515,12 +541,12 @@ function bindEvents() {
   });
   $('coordsForm').addEventListener('submit', e => {
     e.preventDefault();
-    const lat = parseFloat($('latInput').value), lon = parseFloat($('lonInput').value);
+    const lat = parseCoordinate($('latInput').value), lon = parseCoordinate($('lonInput').value);
     if (Number.isFinite(lat) && Number.isFinite(lon)) {
       setPlace({ lat, lon, name: 'Custom location' }, { chosen: true });
       togglePlacePanel(false);
     } else {
-      showPlaceMessage('Enter both latitude and longitude as numbers, for example 40.7128 and −74.0060.');
+      showPlaceMessage('Enter both latitude and longitude as numbers, for example 40.7128 and -74.0060.');
     }
   });
 

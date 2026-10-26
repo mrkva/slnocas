@@ -123,14 +123,23 @@ th { text-transform: uppercase; letter-spacing: .08em; font-size: 10.5px; }
 
 /* ---------- Controls ---------- */
 
-.controls, .place-panel { display: grid; gap: 12px; }
+.controls, .place-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .field { display: grid; gap: 4px; flex: 1 1 150px; min-width: 0; }
-.field input { width: 100%; }
+.field input { display: block; width: 100%; max-width: 100%; }
+.coords .field { flex-basis: 110px; }
+
+/* iOS gives date and time inputs an intrinsic width and centred text; make them behave like text fields. */
+input[type="date"], input[type="time"] { min-width: 0; text-align: left; line-height: var(--tap); }
+input::-webkit-date-and-time-value { text-align: left; margin: 0; }
+input::-webkit-datetime-edit { padding: 0; }
+input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; }
 .align-end { align-self: end; }
 .push-right { margin-left: auto; }
 
 input {
+  -webkit-appearance: none;
+  appearance: none;
   font: inherit;
   font-size: 16px; /* keeps iOS from zooming on focus */
   height: var(--tap);
@@ -142,6 +151,9 @@ input {
 }
 
 button {
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
   font: inherit;
   font-size: 12px;
   text-transform: uppercase;
@@ -186,6 +198,7 @@ button {
 .place-button[aria-expanded="true"] .place-name::after { content: " ▴"; }
 
 .results td { padding-top: 4px; padding-bottom: 4px; }
+.results .num { font-size: 12px; }
 .results button {
   width: 100%;
   padding: 0;

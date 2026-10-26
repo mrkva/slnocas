@@ -33,11 +33,11 @@
       <button type="submit" class="align-end">Search</button>
     </form>
     <table class="results" id="searchResults" hidden></table>
-    <form class="row" id="coordsForm">
+    <form class="row coords" id="coordsForm">
       <label class="field"><span class="k">Latitude</span>
-        <input type="number" inputmode="decimal" id="latInput" step="any" min="-65" max="65" placeholder="e.g. 40.7128"></label>
+        <input type="text" id="latInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="40.7128"></label>
       <label class="field"><span class="k">Longitude</span>
-        <input type="number" inputmode="decimal" id="lonInput" step="any" min="-180" max="180" placeholder="e.g. −74.0060"></label>
+        <input type="text" id="lonInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="-74.0060"></label>
       <button type="submit" class="align-end">Set</button>
     </form>
     <div class="row">
